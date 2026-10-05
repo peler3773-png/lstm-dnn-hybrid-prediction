@@ -1,0 +1,31 @@
+name: Perbarui Prediksi
+on:
+  schedule:
+    - cron: '0 13 * * *'  # Setiap hari pukul 20:00 WIB
+  workflow_dispatch:        # Bisa jalankan manual juga
+
+jobs:
+  jalankan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Siapkan Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Pasang pustaka
+        run: |
+          pip install pandas numpy scikit-learn tensorflow requests
+          
+      - name: Jalankan model
+        run: python model_hibrida.py
+        
+      - name: Simpan hasil
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "actions[bot]@users.noreply.github.com"
+          git add hasil_prediksi.json
+          git commit -m "🤖 Perbarui hasil prediksi" || echo "Tidak ada perubahan"
+          git push || echo "Gagal dorong, dilewati"
