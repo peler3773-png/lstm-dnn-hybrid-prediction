@@ -19,7 +19,7 @@ KODE_DIPROSES = ["CLF", "BE", "SD", "SGP", "PS", "HK"]
 
 PANJANG_URUTAN = 5
 EPOCHS = 300
-JAM_PREDIKSI = 20
+JAM_PREDIKSI = 7
 PANJANG_ANGKA = 7  # ← 7 digit
 
 pasaran_list = ["Legi", "Pahing", "Pon", "Wage", "Kliwon"]
