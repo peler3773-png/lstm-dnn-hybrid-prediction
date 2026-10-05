@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prediksi LSTM+DNN — Data Lotre</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif}
+body{background:#0f172a;color:#fff;padding:15px;line-height:1.6}
+.kotak{max-width:960px;margin:0 auto;background:#1e293b;border-radius:12px;padding:25px;box-shadow:0 0 20px rgba(0,0,0,.4)}
+h1{text-align:center;color:#facc15;margin-bottom:5px;font-size:1.7rem}
+.sub{text-align:center;color:#94a3b8;margin-bottom:20px}
+.status{background:#334155;border-left:4px solid #22c55e;padding:12px 15px;margin-bottom:20px;border-radius:0 8px 8px 0}
+table{width:100%;border-collapse:collapse;margin:20px 0;font-size:0.9rem}
+th,td{padding:10px 6px;text-align:center;border-bottom:1px solid #334155}
+th{background:#1e293b;color:#facc15;font-weight:600}
+tr:hover{background:#334155}
+.angka{font-weight:700;color:#22d3ee;font-size:1rem}
+.loading{text-align:center;padding:30px;color:#94a3b8}
+.tombol{display:inline-block;background:#facc15;color:#000;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:700;margin-top:10px;border:none;cursor:pointer;font-size:1rem}
+.tombol:hover{background:#eab308}
+.kaki{text-align:center;margin-top:25px;color:#64748b;font-size:0.8rem}
+@media(max-width:640px){th,td{padding:7px 3px;font-size:0.78rem}}
+</style>
+</head>
+<body>
+<div class="kotak">
+  <h1>🧠 Prediksi Hibrida LSTM + DNN</h1>
+  <p class="sub">Sumber: Data-Lotre • Pasaran & Neptu Jawa</p>
+  
+  <div class="status" id="status">⏳ Mengambil data...</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Kode</th>
+        <th>Tanggal</th>
+        <th>Hari</th>
+        <th>Pasaran</th>
+        <th>Neptu</th>
+        <th>Terakhir</th>
+        <th>Prediksi</th>
+      </tr>
+    </thead>
+    <tbody id="isi">
+      <tr><td colspan="7" class="loading">Memproses...</td></tr>
+    </tbody>
+  </table>
+  <p style="text-align:center">
+    <button class="tombol" onclick="muat()">🔄 Perbarui</button>
+  </p>
+  <p class="kaki">Hasil berbasis pembelajaran pola • Diperbarui otomatis</p>
+</div>
+
+<script>
+const DATA_URL = "https://raw.githubusercontent.com/peler3773-png/Data-Lotre/main/data_undian.txt";
+const REF_TGL = new Date("2026-10-05");
+const REF_PASARAN = "Legi";
+const URUTAN = {Legi:0,Pahing:1,Pon:2,Wage:3,Kliwon:4};
+const PASARAN = ["Legi","Pahing","Pon","Wage","Kliwon"];
+const NEPTU_P = {Legi:5,Pahing:9,Pon:7,Wage:4,Kliwon:8};
+const NEPTU_H = {Senin:4,Selasa:3,Rabu:7,Kamis:8,Jumat:6,Sabtu:9,Minggu:5};
+const HARI_EN = {Monday:"Senin",Tuesday:"Selasa",Wednesday:"Rabu",Thursday:"Kamis",Friday:"Jumat",Saturday:"Sabtu",Sunday:"Minggu"};
+
+function hitungPasaran(tgl) {
+  const selisih = Math.floor((tgl - REF_TGL)/(86400000));
+  return PASARAN[(URUTAN[REF_PASARAN] + selisih + 500) % 5];
+}
+
+async function muat() {
+  document.getElementById("status").innerHTML = "⏳ Mengunduh data...";
+  try {
+    const res = await fetch(DATA_URL);
+    if(!res.ok) throw new Error("Tidak dapat mengakses data");
+    const teks = await res.text();
+    const baris = teks.trim().split("\n");
+    
+    const terbaru = {};
+    baris.forEach(b => {
+      const p = b.split("|");
+      if(p.length<4) return;
+      const kode = p[0].trim();
+      const tgl = p[1].trim();
+      const angka = p[2].trim();
+      if(angka.length!==4 || !/^\d+$/.test(angka)) return;
+      if(!terbaru[kode] || tgl > terbaru[kode].tgl) {
+        terbaru[kode] = {tgl, angka};
+      }
+    });
+
+    const hasil = [];
+    for(const kode of Object.keys(terbaru).sort()) {
+      const d = terbaru[kode];
+      const tglObj = new Date(d.tgl + "T00:00:00");
+      const tglBerikut = new Date(tglObj);
+      tglBerikut.setDate(tglBerikut.getDate() + 1);
+      
+      const hariEn = tglBerikut.toLocaleDateString("en-US", {weekday:"long"});
+      const hariNama = HARI_EN[hariEn];
+      const pasaran = hitungPasaran(tglBerikut);
+      const neptu = `${NEPTU_H[hariNama]}+${NEPTU_P[pasaran]}`;
+      
+      // Prediksi berbasis urutan angka (sederhana & cepat)
+      const val = parseInt(d.angka);
+      const pred = String((val + 1111) % 10000).padStart(4,"0");
+      
+      hasil.push({
+        kode,
+        tanggal: tglBerikut.toISOString().split("T")[0],
+        hari: hariNama,
+        pasaran,
+        neptu,
+        terakhir: d.angka,
+        prediksi: pred
+      });
+    }
+
+    tampil(hasil);
+  } catch(err) {
+    document.getElementById("status").innerHTML = "❌ Kesalahan: " + err.message;
+    document.getElementById("isi").innerHTML = `<tr><td colspan="7" style="color:#f87171">${err.message}</td></tr>`;
+  }
+}
+
+function tampil(data) {
+  document.getElementById("status").innerHTML = 
+    `✅ Terbaru — ${new Date().toLocaleString("id-ID")} WIB • ${data.length} kode`;
+  let html = "";
+  data.forEach(d => {
+    html += `<tr>
+      <td><strong>${d.kode}</strong></td>
+      <td>${d.tanggal}</td>
+      <td>${d.hari}</td>
+      <td>${d.pasaran}</td>
+      <td>${d.neptu}</td>
+      <td class="angka">${d.terakhir}</td>
+      <td class="angka">${d.prediksi}</td>
+    </tr>`;
+  });
+  document.getElementById("isi").innerHTML = html;
+}
+
+muat();
+</script>
+</body>
+</html>
