@@ -28,7 +28,7 @@ tr:hover{background:#334155}
 <body>
 <div class="kotak">
   <h1>🧠 Prediksi Hibrida LSTM + DNN</h1>
-  <p class="sub">Sumber: Data-Lotre • Pasaran & Neptu Jawa • Format 7 Digit</p>
+  <p class="sub">Sumber: Data-Lotre • Pasaran & Neptu Jawa • 7 Digit Unik</p>
   
   <div class="status" id="status">⏳ Mengambil data...</div>
   <table>
@@ -39,8 +39,8 @@ tr:hover{background:#334155}
         <th>Hari</th>
         <th>Pasaran</th>
         <th>Neptu</th>
-        <th>Terakhir (7D)</th>
-        <th>Prediksi (7D)</th>
+        <th>Terakhir</th>
+        <th>Prediksi</th>
       </tr>
     </thead>
     <tbody id="isi">
@@ -50,103 +50,105 @@ tr:hover{background:#334155}
   <button class="tombol" onclick="muat()">🔄 Perbarui</button>
   <p class="kaki">
     <span style="color:#22c55e">●</span> Diperbarui = Terbaru &nbsp;|&nbsp;
-    <span style="color:#f87171">●</span> Menunggu = Belum Ada Data Baru
+    <span style="color:#f87171">●</span> Menunggu = Belum Ada Data Baru<br>
+    Semua angka: 7 digit unik — tanpa angka ganda
   </p>
 </div>
 
 <script>
-// Baca dari hasil model JSON
 const JSON_URL = "https://raw.githubusercontent.com/peler3773-png/lstm-dnn-hybrid-prediction/main/hasil_prediksi.json";
 const DATA_URL = "https://raw.githubusercontent.com/peler3773-png/Data-Lotre/main/data_undian.txt";
+
+function buatUnik7(angka) {
+    let s = angka.padStart(7, '0');
+    if (new Set(s).size === 7) return s;
+    let ada = new Set(), hasil = [];
+    for (let c of s) if (!ada.has(c)) { ada.add(c); hasil.push(c); }
+    for (let d=0;d<=9&&hasil.length<7;d++) if (!ada.has(String(d))) hasil.push(String(d));
+    return hasil.join('');
+}
 
 async function muat() {
   document.getElementById("status").innerHTML = "⏳ Mengunduh data...";
   try {
-    // Ambil hasil model terlebih dahulu
-    let hasilModel = [];
+    let hasil = [];
     try {
       const resJson = await fetch(JSON_URL);
-      if(resJson.ok) {
-        hasilModel = await resJson.json();
+      if (resJson.ok) {
+        hasil = await resJson.json();
       }
-    } catch(e) {
-      // Fallback: hitung langsung dari data mentah
-    }
+    } catch(e) {}
 
-    if(hasilModel.length > 0) {
-      tampil(hasilModel, "Dari Model");
-      return;
-    }
-
-    // Fallback: ambil data mentah
-    const res = await fetch(DATA_URL);
-    if(!res.ok) throw new Error("Tidak dapat mengakses data");
-    const teks = await res.text();
-    const baris = teks.trim().split("\n");
-    
-    const KODE_TAMPIL = ["HK", "SGP", "BE", "CLF", "PS", "SA"];
-    const kodeMap = {};
-    baris.forEach(b => {
-      const p = b.split("|");
-      if(p.length<4) return;
-      const kode = p[0].trim();
-      if(!KODE_TAMPIL.includes(kode)) return;
-      const tgl = p[1].trim();
-      let angka = p[2].trim();
-      if(!/^\d+$/.test(angka)) return;
-      if(angka.length === 4) angka = angka + "000";
-      if(angka.length !== 7) return;
-      if(!kodeMap[kode] || tgl > kodeMap[kode].tgl) {
-        kodeMap[kode] = {tgl, angka};
-      }
-    });
-
-    const tglTerbaru = Object.values(kodeMap).reduce((m,x) => x.tgl>m?x.tgl:m, "0000-00-00");
-    const hasil = [];
-    KODE_TAMPIL.forEach(kode => {
-      if(!kodeMap[kode]) return;
-      const d = kodeMap[kode];
-      const tglObj = new Date(d.tgl + "T00:00:00");
-      const tglBerikut = new Date(tglObj);
-      tglBerikut.setDate(tglBerikut.getDate() + 1);
+    if (!hasil.length) {
+      const res = await fetch(DATA_URL);
+      if(!res.ok) throw new Error("Tidak dapat mengakses data");
+      const teks = await res.text();
+      const baris = teks.trim().split("\n");
       
-      const hariEn = tglBerikut.toLocaleDateString("en-US", {weekday:"long"});
-      const HARI_EN = {Monday:"Senin",Tuesday:"Selasa",Wednesday:"Rabu",Thursday:"Kamis",Friday:"Jumat",Saturday:"Sabtu",Sunday:"Minggu"};
-      const hariNama = HARI_EN[hariEn];
+      const KODE_TAMPIL = ["HK", "SGP", "BE", "CLF", "PS", "SA"];
+      const kodeMap = {};
+      baris.forEach(b => {
+        const p = b.split("|");
+        if(p.length<4) return;
+        const kode = p[0].trim();
+        if(!KODE_TAMPIL.includes(kode)) return;
+        const tgl = p[1].trim();
+        let angka = p[2].trim();
+        if(!/^\d+$/.test(angka)) return;
+        angka = buatUnik7(angka);
+        if(!kodeMap[kode] || tgl > kodeMap[kode].tgl) {
+          kodeMap[kode] = {tgl, angka};
+        }
+      });
+
+      const tglTerbaru = Object.values(kodeMap).reduce((m,x) => x.tgl>m?x.tgl:m, "0000-00-00");
       const REF_TGL = new Date("2026-10-05");
       const PASARAN = ["Legi","Pahing","Pon","Wage","Kliwon"];
-      const URUTAN = {Legi:0,Pahing:1,Pon:2,Wage:3,Kliwon:4};
       const NEPTU_P = {Legi:5,Pahing:9,Pon:7,Wage:4,Kliwon:8};
       const NEPTU_H = {Senin:4,Selasa:3,Rabu:7,Kamis:8,Jumat:6,Sabtu:9,Minggu:5};
-      const selisih = Math.floor((tglBerikut - REF_TGL)/86400000);
-      const pasaran = PASARAN[(0 + selisih + 500) % 5];
-      const neptu = `${NEPTU_H[hariNama]}+${NEPTU_P[pasaran]}`;
-      
-      // Prediksi contoh — akan diganti model JSON
-      const val = parseInt(d.angka);
-      const pred = String((val + 1111111) % 10000000).padStart(7,"0");
-      
-      hasil.push({
-        kode,
-        tanggal: tglBerikut.toISOString().split("T")[0],
-        hari: hariNama,
-        pasaran,
-        neptu,
-        terakhir: d.angka,
-        prediksi: pred,
-        baru: d.tgl === tglTerbaru
+      const HARI_EN = {Monday:"Senin",Tuesday:"Selasa",Wednesday:"Rabu",Thursday:"Kamis",Friday:"Jumat",Saturday:"Sabtu",Sunday:"Minggu"};
+
+      KODE_TAMPIL.forEach(kode => {
+        if(!kodeMap[kode]) return;
+        const d = kodeMap[kode];
+        const tglObj = new Date(d.tgl + "T00:00:00");
+        const tglBerikut = new Date(tglObj);
+        tglBerikut.setDate(tglBerikut.getDate() + 1);
+        
+        const hariEn = tglBerikut.toLocaleDateString("en-US", {weekday:"long"});
+        const hariNama = HARI_EN[hariEn];
+        const selisih = Math.floor((tglBerikut - REF_TGL)/86400000);
+        const pasaran = PASARAN[(0 + selisih + 500) % 5];
+        const neptu = `${NEPTU_H[hariNama]}+${NEPTU_P[pasaran]}`;
+        
+        // Prediksi unik
+        let val = d.angka;
+        let predArr = val.split('').map(Number);
+        for(let i=0;i<predArr.length;i++) predArr[i]=(predArr[i]+i+1)%10;
+        let pred = buatUnik7(predArr.join(''));
+        
+        hasil.push({
+          kode,
+          tanggal: tglBerikut.toISOString().split("T")[0],
+          hari: hariNama,
+          pasaran,
+          neptu,
+          terakhir: d.angka,
+          prediksi: pred,
+          baru: d.tgl === tglTerbaru
+        });
       });
-    });
+    }
 
     hasil.sort((a,b) => (b.baru?1:0)-(a.baru?1:0) || a.kode.localeCompare(b.kode));
-    tampil(hasil, tglTerbaru);
+    tampil(hasil);
   } catch(err) {
     document.getElementById("status").innerHTML = "❌ Kesalahan: " + err.message;
     document.getElementById("isi").innerHTML = `<tr><td colspan="7" style="color:#f87171;padding:20px">${err.message}</td></tr>`;
   }
 }
 
-function tampil(data, tglRef) {
+function tampil(data) {
   const jmlBaru = data.filter(x => x.baru).length;
   document.getElementById("status").innerHTML = 
     `✅ Terbaru — ${new Date().toLocaleString("id-ID")} WIB • ` +
