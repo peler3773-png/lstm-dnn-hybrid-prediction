@@ -13,14 +13,11 @@ warnings.filterwarnings("ignore")
 # ==================================================
 
 DATA_URL = "https://raw.githubusercontent.com/peler3773-png/Data-Lotre/main/data_undian.txt"
-
-# Hanya kode yang diproses
-KODE_DIPROSES = ["CLF", "BE", "SD", "SGP", "PS", "HK"]
-
+KODE_DIPROSES = ["HK", "SGP", "BE", "CLF", "PS", "SD"]
 PANJANG_URUTAN = 5
 EPOCHS = 300
-JAM_PREDIKSI = 7
-PANJANG_ANGKA = 7  # ← 7 digit
+JAM_PREDIKSI = 20
+PANJANG_ANGKA = 7  # 7 digit murni
 
 pasaran_list = ["Legi", "Pahing", "Pon", "Wage", "Kliwon"]
 neptu_pasaran = {"Legi":5, "Pahing":9, "Pon":7, "Wage":4, "Kliwon":8}
@@ -37,6 +34,25 @@ URUTAN_PASARAN = {"Legi":0, "Pahing":1, "Pon":2, "Wage":3, "Kliwon":4}
 def hitung_pasaran(tgl):
     selisih = (tgl - REF_TGL).days
     return pasaran_list[(URUTAN_PASARAN[REF_PASARAN] + selisih) % 5]
+
+def unik_7digit(angka_int):
+    """Pastikan 7 digit berbeda, tanpa angka ganda, tanpa nol tambahan"""
+    s = str(angka_int).zfill(7)
+    # Sudah unik? Langsung kembalikan
+    if len(set(s)) == 7:
+        return s
+    # Buat urutan unik dari angka asli + urutan acak terkontrol
+    asal = list(s)
+    dipakai = []
+    for c in asal:
+        if c not in dipakai:
+            dipakai.append(c)
+    # Isi kekurangan dengan digit yang belum ada
+    semua = set("0123456789")
+    tersedia = sorted(semua - set(dipakai))
+    while len(dipakai) < 7 and tersedia:
+        dipakai.append(tersedia.pop(0))
+    return "".join(dipakai[:7])
 
 # ==================================================
 # 📥 AMBIL DATA
@@ -56,11 +72,17 @@ for b in baris:
     tgl_str = p[1].strip()
     angka_str = p[2].strip()
     
-    # Terima 4 atau 7 digit — sisanya isi nol
+    # Terima 4 digit → perluas jadi 7 digit unik, TANPA tambah nol
     if not angka_str.isdigit(): continue
     if len(angka_str) == 4:
-        angka_str = angka_str + "000"  # 4 digit → tambah 000 jadi 7
+        # Isi 3 digit lain yang belum muncul → unik murni
+        ada = set(angka_str)
+        semua = set("0123456789")
+        tambah = sorted(semua - ada)[:3]
+        angka_str = angka_str + "".join(tambah)
     if len(angka_str) != PANJANG_ANGKA: continue
+    if len(set(angka_str)) != 7:
+        angka_str = unik_7digit(int(angka_str))
     
     try:
         tgl_obj = datetime.strptime(tgl_str, "%Y-%m-%d").date()
@@ -86,7 +108,7 @@ for kode in KODE_DIPROSES:
     df = df_penuh[df_penuh["kode"] == kode].sort_values("tanggal").reset_index(drop=True)
     
     if len(df) < PANJANG_URUTAN + 3:
-        print(f"⚠️ {kode} — Data tidak cukup ({len(df)} baris), dilewati")
+        print(f"⚠️ {kode} — Data tidak cukup, dilewati")
         continue
 
     angka = df["angka"].values
@@ -156,9 +178,9 @@ for kode in KODE_DIPROSES:
     pred = model.predict([inp1, inp2], verbose=0)
     angka_pred = int(round(scaler_a.inverse_transform(pred)[0][0]))
     
-    # Format 7 digit
-    angka_pred_str = f"{angka_pred:0{PANJANG_ANGKA}d}"
-    angka_terakhir_str = f"{terakhir[-1]:0{PANJANG_ANGKA}d}"
+    # Pastikan 7 digit unik — tanpa angka ganda
+    pred_unik = unik_7digit(angka_pred)
+    terakhir_unik = unik_7digit(terakhir[-1])
 
     hasil_akhir.append({
         "kode": kode,
@@ -166,11 +188,11 @@ for kode in KODE_DIPROSES:
         "hari": hari_nanti,
         "pasaran": pasaran_nanti,
         "neptu": f"{neptu_hari[hari_nanti]}+{neptu_pasaran[pasaran_nanti]}",
-        "terakhir": angka_terakhir_str,
-        "prediksi": angka_pred_str
+        "terakhir": terakhir_unik,
+        "prediksi": pred_unik
     })
 
-    print(f"✅ {kode} → {angka_pred_str}")
+    print(f"✅ {kode} → {pred_unik}")
 
 # ==================================================
 # 💾 SIMPAN HASIL
@@ -179,5 +201,5 @@ for kode in KODE_DIPROSES:
 with open("hasil_prediksi.json", "w", encoding="utf-8") as f:
     json.dump(hasil_akhir, f, ensure_ascii=False, indent=2)
 
-print(f"\n💾 Selesai! Diproses: {len(hasil_akhir)} dari {len(KODE_DIPROSES)} kode")
-print(f"📄 Hasil disimpan ke: hasil_prediksi.json")
+print(f"\n💾 Selesai! Diproses: {len(hasil_akhir)} kode")
+print(f"📄 Semua angka 7 digit unik — tanpa angka ganda")
