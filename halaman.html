@@ -85,7 +85,7 @@ async function muat() {
       const teks = await res.text();
       const baris = teks.trim().split("\n");
       
-      const KODE_TAMPIL = ["HK", "SGP", "BE", "CLF", "PS", "SA"];
+      const KODE_TAMPIL = ["CLF", "BE", "SD", "SGP", "PS", "HK"];
       const kodeMap = {};
       baris.forEach(b => {
         const p = b.split("|");
