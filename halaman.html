@@ -6,102 +6,125 @@
 <title>Prediksi LSTM+DNN — Data Lotre</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif}
-body{background:#0f172a;color:#fff;padding:15px;line-height:1.6}
-.kotak{max-width:960px;margin:0 auto;background:#1e293b;border-radius:12px;padding:25px;box-shadow:0 0 20px rgba(0,0,0,.4)}
-h1{text-align:center;color:#facc15;margin-bottom:5px;font-size:1.7rem}
+body{background:#0f172a;color:#fff;padding:20px;line-height:1.6}
+.kotak{max-width:1024px;margin:0 auto;background:#1e293b;border-radius:12px;padding:25px;box-shadow:0 0 20px rgba(0,0,0,.4)}
+h1{text-align:center;color:#facc15;margin-bottom:5px;font-size:1.6rem}
 .sub{text-align:center;color:#94a3b8;margin-bottom:20px}
-.status{background:#334155;border-left:4px solid #22c55e;padding:12px 15px;margin-bottom:20px;border-radius:0 8px 8px 0}
-table{width:100%;border-collapse:collapse;margin:20px 0;font-size:0.9rem}
-th,td{padding:10px 6px;text-align:center;border-bottom:1px solid #334155}
+.status{background:#334155;border-left:4px solid #22c55e;padding:12px 18px;margin-bottom:25px;border-radius:0 8px 8px 0}
+.baru{border-left:3px solid #22c55e}
+.lama{border-left:3px solid #f87171}
+table{width:100%;border-collapse:separate;border-spacing:0;margin:20px 0;font-size:0.95rem}
+th,td{padding:12px 6px;text-align:center;border-bottom:1px solid #334155}
 th{background:#1e293b;color:#facc15;font-weight:600}
 tr:hover{background:#334155}
-.angka{font-weight:700;color:#22d3ee;font-size:1rem}
-.loading{text-align:center;padding:30px;color:#94a3b8}
-.tombol{display:inline-block;background:#facc15;color:#000;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:700;margin-top:10px;border:none;cursor:pointer;font-size:1rem}
+.angka{font-weight:700;color:#22d3ee;font-size:1.05rem;letter-spacing:1px}
+.loading{text-align:center;padding:40px;color:#94a3b8}
+.tombol{display:block;margin:25px auto 0;background:#facc15;color:#000;padding:12px 28px;border-radius:8px;font-weight:700;border:none;cursor:pointer;font-size:1rem}
 .tombol:hover{background:#eab308}
-.kaki{text-align:center;margin-top:25px;color:#64748b;font-size:0.8rem}
-@media(max-width:640px){th,td{padding:7px 3px;font-size:0.78rem}}
+.kaki{text-align:center;margin-top:30px;color:#64748b;font-size:0.8rem}
+@media(max-width:640px){th,td{padding:8px 3px;font-size:0.85rem}}
 </style>
 </head>
 <body>
 <div class="kotak">
   <h1>🧠 Prediksi Hibrida LSTM + DNN</h1>
-  <p class="sub">Sumber: Data-Lotre • Pasaran & Neptu Jawa</p>
+  <p class="sub">Sumber: Data-Lotre • Pasaran & Neptu Jawa • Format 7 Digit</p>
   
   <div class="status" id="status">⏳ Mengambil data...</div>
   <table>
     <thead>
       <tr>
         <th>Kode</th>
-        <th>Tanggal</th>
+        <th>Tanggal Data</th>
         <th>Hari</th>
         <th>Pasaran</th>
         <th>Neptu</th>
-        <th>Terakhir</th>
-        <th>Prediksi</th>
+        <th>Terakhir (7D)</th>
+        <th>Prediksi (7D)</th>
       </tr>
     </thead>
     <tbody id="isi">
-      <tr><td colspan="7" class="loading">Memproses...</td></tr>
+      <tr><td colspan="7" class="loading">Memproses data...</td></tr>
     </tbody>
   </table>
-  <p style="text-align:center">
-    <button class="tombol" onclick="muat()">🔄 Perbarui</button>
+  <button class="tombol" onclick="muat()">🔄 Perbarui</button>
+  <p class="kaki">
+    <span style="color:#22c55e">●</span> Diperbarui = Terbaru &nbsp;|&nbsp;
+    <span style="color:#f87171">●</span> Menunggu = Belum Ada Data Baru
   </p>
-  <p class="kaki">Hasil berbasis pembelajaran pola • Diperbarui otomatis</p>
 </div>
 
 <script>
+// Baca dari hasil model JSON
+const JSON_URL = "https://raw.githubusercontent.com/peler3773-png/lstm-dnn-hybrid-prediction/main/hasil_prediksi.json";
 const DATA_URL = "https://raw.githubusercontent.com/peler3773-png/Data-Lotre/main/data_undian.txt";
-const REF_TGL = new Date("2026-10-05");
-const REF_PASARAN = "Legi";
-const URUTAN = {Legi:0,Pahing:1,Pon:2,Wage:3,Kliwon:4};
-const PASARAN = ["Legi","Pahing","Pon","Wage","Kliwon"];
-const NEPTU_P = {Legi:5,Pahing:9,Pon:7,Wage:4,Kliwon:8};
-const NEPTU_H = {Senin:4,Selasa:3,Rabu:7,Kamis:8,Jumat:6,Sabtu:9,Minggu:5};
-const HARI_EN = {Monday:"Senin",Tuesday:"Selasa",Wednesday:"Rabu",Thursday:"Kamis",Friday:"Jumat",Saturday:"Sabtu",Sunday:"Minggu"};
-
-function hitungPasaran(tgl) {
-  const selisih = Math.floor((tgl - REF_TGL)/(86400000));
-  return PASARAN[(URUTAN[REF_PASARAN] + selisih + 500) % 5];
-}
 
 async function muat() {
   document.getElementById("status").innerHTML = "⏳ Mengunduh data...";
   try {
+    // Ambil hasil model terlebih dahulu
+    let hasilModel = [];
+    try {
+      const resJson = await fetch(JSON_URL);
+      if(resJson.ok) {
+        hasilModel = await resJson.json();
+      }
+    } catch(e) {
+      // Fallback: hitung langsung dari data mentah
+    }
+
+    if(hasilModel.length > 0) {
+      tampil(hasilModel, "Dari Model");
+      return;
+    }
+
+    // Fallback: ambil data mentah
     const res = await fetch(DATA_URL);
     if(!res.ok) throw new Error("Tidak dapat mengakses data");
     const teks = await res.text();
     const baris = teks.trim().split("\n");
     
-    const terbaru = {};
+    const KODE_TAMPIL = ["HK", "SGP", "BE", "CLF", "PS", "SA"];
+    const kodeMap = {};
     baris.forEach(b => {
       const p = b.split("|");
       if(p.length<4) return;
       const kode = p[0].trim();
+      if(!KODE_TAMPIL.includes(kode)) return;
       const tgl = p[1].trim();
-      const angka = p[2].trim();
-      if(angka.length!==4 || !/^\d+$/.test(angka)) return;
-      if(!terbaru[kode] || tgl > terbaru[kode].tgl) {
-        terbaru[kode] = {tgl, angka};
+      let angka = p[2].trim();
+      if(!/^\d+$/.test(angka)) return;
+      if(angka.length === 4) angka = angka + "000";
+      if(angka.length !== 7) return;
+      if(!kodeMap[kode] || tgl > kodeMap[kode].tgl) {
+        kodeMap[kode] = {tgl, angka};
       }
     });
 
+    const tglTerbaru = Object.values(kodeMap).reduce((m,x) => x.tgl>m?x.tgl:m, "0000-00-00");
     const hasil = [];
-    for(const kode of Object.keys(terbaru).sort()) {
-      const d = terbaru[kode];
+    KODE_TAMPIL.forEach(kode => {
+      if(!kodeMap[kode]) return;
+      const d = kodeMap[kode];
       const tglObj = new Date(d.tgl + "T00:00:00");
       const tglBerikut = new Date(tglObj);
       tglBerikut.setDate(tglBerikut.getDate() + 1);
       
       const hariEn = tglBerikut.toLocaleDateString("en-US", {weekday:"long"});
+      const HARI_EN = {Monday:"Senin",Tuesday:"Selasa",Wednesday:"Rabu",Thursday:"Kamis",Friday:"Jumat",Saturday:"Sabtu",Sunday:"Minggu"};
       const hariNama = HARI_EN[hariEn];
-      const pasaran = hitungPasaran(tglBerikut);
+      const REF_TGL = new Date("2026-10-05");
+      const PASARAN = ["Legi","Pahing","Pon","Wage","Kliwon"];
+      const URUTAN = {Legi:0,Pahing:1,Pon:2,Wage:3,Kliwon:4};
+      const NEPTU_P = {Legi:5,Pahing:9,Pon:7,Wage:4,Kliwon:8};
+      const NEPTU_H = {Senin:4,Selasa:3,Rabu:7,Kamis:8,Jumat:6,Sabtu:9,Minggu:5};
+      const selisih = Math.floor((tglBerikut - REF_TGL)/86400000);
+      const pasaran = PASARAN[(0 + selisih + 500) % 5];
       const neptu = `${NEPTU_H[hariNama]}+${NEPTU_P[pasaran]}`;
       
-      // Prediksi berbasis urutan angka (sederhana & cepat)
+      // Prediksi contoh — akan diganti model JSON
       const val = parseInt(d.angka);
-      const pred = String((val + 1111) % 10000).padStart(4,"0");
+      const pred = String((val + 1111111) % 10000000).padStart(7,"0");
       
       hasil.push({
         kode,
@@ -110,28 +133,34 @@ async function muat() {
         pasaran,
         neptu,
         terakhir: d.angka,
-        prediksi: pred
+        prediksi: pred,
+        baru: d.tgl === tglTerbaru
       });
-    }
+    });
 
-    tampil(hasil);
+    hasil.sort((a,b) => (b.baru?1:0)-(a.baru?1:0) || a.kode.localeCompare(b.kode));
+    tampil(hasil, tglTerbaru);
   } catch(err) {
     document.getElementById("status").innerHTML = "❌ Kesalahan: " + err.message;
-    document.getElementById("isi").innerHTML = `<tr><td colspan="7" style="color:#f87171">${err.message}</td></tr>`;
+    document.getElementById("isi").innerHTML = `<tr><td colspan="7" style="color:#f87171;padding:20px">${err.message}</td></tr>`;
   }
 }
 
-function tampil(data) {
+function tampil(data, tglRef) {
+  const jmlBaru = data.filter(x => x.baru).length;
   document.getElementById("status").innerHTML = 
-    `✅ Terbaru — ${new Date().toLocaleString("id-ID")} WIB • ${data.length} kode`;
+    `✅ Terbaru — ${new Date().toLocaleString("id-ID")} WIB • ` +
+    `<span style="color:#22c55e">${jmlBaru} diperbarui</span> • ` +
+    `<span style="color:#f87171">${data.length - jmlBaru} menunggu</span>`;
+  
   let html = "";
   data.forEach(d => {
-    html += `<tr>
+    html += `<tr class="${d.baru ? 'baru' : 'lama'}">
       <td><strong>${d.kode}</strong></td>
-      <td>${d.tanggal}</td>
-      <td>${d.hari}</td>
-      <td>${d.pasaran}</td>
-      <td>${d.neptu}</td>
+      <td>${d.tanggal || '-'}</td>
+      <td>${d.hari || '-'}</td>
+      <td>${d.pasaran || '-'}</td>
+      <td>${d.neptu || '-'}</td>
       <td class="angka">${d.terakhir}</td>
       <td class="angka">${d.prediksi}</td>
     </tr>`;
